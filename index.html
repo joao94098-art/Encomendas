@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rastreio de Encomendas</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #e8ff5a;
+    --accent2: #5affd4;
+    --text: #f0f0f0;
+    --muted: #555570;
+    --danger: #ff5a5a;
+    --warn: #ffaa5a;
+    --success: #5affa0;
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Syne', sans-serif; min-height: 100vh; padding: 24px; }
+
+  header { display: flex; align-items: baseline; gap: 16px; margin-bottom: 32px; flex-wrap: wrap; }
+  header h1 { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); font-size: 0.85rem; font-family: 'DM Mono', monospace; }
+
+  /* API Key Bar */
+  .api-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .api-bar label { font-size: 0.75rem; font-family: 'DM Mono', monospace; color: var(--muted); white-space: nowrap; }
+  .api-bar input {
+    flex: 1; min-width: 240px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.85rem;
+    padding: 8px 12px; outline: none; transition: border-color 0.2s;
+  }
+  .api-bar input:focus { border-color: var(--accent); }
+  .api-bar input::placeholder { color: var(--muted); }
+  .api-status { font-size: 0.72rem; font-family: 'DM Mono', monospace; white-space: nowrap; }
+  .api-status.ok { color: var(--success); }
+  .api-status.err { color: var(--danger); }
+  .api-status.none { color: var(--muted); }
+  .api-link { font-size: 0.72rem; font-family: 'DM Mono', monospace; color: var(--accent2); text-decoration: none; white-space: nowrap; }
+  .api-link:hover { text-decoration: underline; }
+
+  .layout { display: grid; grid-template-columns: 360px 1fr; gap: 24px; align-items: start; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .card h2 { font-size: 0.72rem; font-family: 'DM Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 18px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 0.75rem; color: var(--muted); font-family: 'DM Mono', monospace; margin-bottom: 5px; }
+  .field input {
+    width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.88rem;
+    padding: 9px 12px; outline: none; transition: border-color 0.2s;
+  }
+  .field input:focus { border-color: var(--accent); }
+  .field input::placeholder { color: var(--muted); }
+  .hint { margin-top: 5px; font-size: 0.7rem; font-family: 'DM Mono', monospace; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .hint .badge { border-radius: 4px; padding: 1px 8px; font-size: 0.65rem; border: 1px solid; }
+
+  .btn {
+    width: 100%; padding: 11px; background: var(--accent); color: #0a0a0f;
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.9rem;
+    border: none; border-radius: 8px; cursor: pointer; letter-spacing: 0.02em;
+    transition: opacity 0.2s, transform 0.1s; margin-top: 2px;
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn:active { transform: scale(0.98); }
+
+  .btn-refresh {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 10px; background: transparent; color: var(--accent2);
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.85rem;
+    border: 1px solid rgba(90,255,212,0.3); border-radius: 8px; cursor: pointer;
+    letter-spacing: 0.02em; transition: all 0.2s; margin-top: 10px;
+  }
+  .btn-refresh:hover { background: rgba(90,255,212,0.08); border-color: var(--accent2); }
+  .btn-refresh:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-refresh .spin { display: inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 18px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-align: center; }
+  .stat .num { font-size: 1.5rem; font-weight: 800; color: var(--accent); }
+  .stat .label { font-size: 0.68rem; font-family: 'DM Mono', monospace; color: var(--muted); margin-top: 2px; }
+
+  .search-bar { display: flex; gap: 10px; margin-bottom: 16px; }
+  .search-bar input {
+    flex: 1; background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.85rem;
+    padding: 9px 12px; outline: none; transition: border-color 0.2s;
+  }
+  .search-bar input:focus { border-color: var(--accent2); }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; min-width: 600px; }
+  thead tr th {
+    font-size: 0.68rem; font-family: 'DM Mono', monospace; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em; padding: 8px 10px;
+    text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.15s; animation: fadeIn 0.3s ease; }
+  tbody tr:hover { background: rgba(232,255,90,0.025); }
+  tbody td { padding: 12px 10px; font-size: 0.85rem; vertical-align: middle; }
+
+  .email-cell { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--accent2); max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tracking-cell { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--muted); }
+  .valor-cell { font-weight: 700; color: var(--accent); white-space: nowrap; }
+
+  .carrier-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    border-radius: 20px; padding: 2px 9px; font-size: 0.68rem;
+    font-family: 'DM Mono', monospace; color: var(--text); white-space: nowrap;
+  }
+  .carrier-badge .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Status pill */
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 5px;
+    border-radius: 20px; padding: 3px 10px; font-size: 0.68rem;
+    font-family: 'DM Mono', monospace; white-space: nowrap; border: 1px solid;
+  }
+  .status-pill.delivered   { color: var(--success); background: rgba(90,255,160,0.08); border-color: rgba(90,255,160,0.25); }
+  .status-pill.transit     { color: var(--accent2); background: rgba(90,255,212,0.08); border-color: rgba(90,255,212,0.25); }
+  .status-pill.pickup      { color: var(--warn);    background: rgba(255,170,90,0.08); border-color: rgba(255,170,90,0.25); }
+  .status-pill.undelivered { color: var(--danger);  background: rgba(255,90,90,0.08);  border-color: rgba(255,90,90,0.25); }
+  .status-pill.expired     { color: var(--muted);   background: rgba(85,85,112,0.1);   border-color: rgba(85,85,112,0.3); }
+  .status-pill.unknown     { color: var(--muted);   background: rgba(85,85,112,0.1);   border-color: rgba(85,85,112,0.3); }
+  .status-pill.loading     { color: var(--muted);   background: rgba(85,85,112,0.1);   border-color: rgba(85,85,112,0.3); }
+
+  .last-event { font-size: 0.7rem; font-family: 'DM Mono', monospace; color: var(--muted); max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .action-btns { display: flex; gap: 5px; align-items: center; }
+  .track-btn {
+    background: var(--accent); color: #0a0a0f; border: none; border-radius: 6px;
+    cursor: pointer; padding: 4px 10px; font-size: 0.72rem; font-family: 'Syne', sans-serif;
+    font-weight: 700; transition: all 0.2s; white-space: nowrap;
+  }
+  .track-btn:hover { opacity: 0.85; }
+  .del-btn {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); cursor: pointer; padding: 4px 9px; font-size: 0.72rem; transition: all 0.2s;
+  }
+  .del-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+  .empty { text-align: center; padding: 48px; color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.85rem; }
+
+  .carriers-info { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .carriers-info h3 { font-size: 0.68rem; font-family: 'DM Mono', monospace; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+  .carriers-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+  .carrier-item { display: flex; align-items: center; gap: 7px; font-size: 0.7rem; font-family: 'DM Mono', monospace; color: var(--muted); }
+  .carrier-item .dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: #0a0a0f;
+    font-family: 'Syne', sans-serif; font-weight: 700; font-size: 0.85rem;
+    padding: 12px 20px; border-radius: 8px; transform: translateY(80px); opacity: 0;
+    transition: all 0.3s cubic-bezier(.34,1.56,.64,1); pointer-events: none; z-index: 999;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  /* Modal de eventos */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 1000; align-items: center; justify-content: center; padding: 24px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 28px; width: 100%; max-width: 560px; max-height: 80vh; overflow-y: auto;
+    animation: fadeIn 0.2s ease;
+  }
+  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+  .modal-header h3 { font-size: 1rem; font-weight: 700; }
+  .modal-close { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); cursor: pointer; padding: 4px 10px; font-size: 0.8rem; transition: all 0.2s; }
+  .modal-close:hover { border-color: var(--danger); color: var(--danger); }
+
+  .timeline { position: relative; padding-left: 20px; }
+  .timeline::before { content: ''; position: absolute; left: 6px; top: 6px; bottom: 6px; width: 1px; background: var(--border); }
+  .event { position: relative; margin-bottom: 18px; }
+  .event::before { content: ''; position: absolute; left: -17px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); border: 2px solid var(--bg); }
+  .event:first-child::before { background: var(--success); }
+  .event-time { font-size: 0.68rem; font-family: 'DM Mono', monospace; color: var(--muted); margin-bottom: 2px; }
+  .event-desc { font-size: 0.82rem; color: var(--text); }
+  .event-location { font-size: 0.7rem; font-family: 'DM Mono', monospace; color: var(--accent2); margin-top: 2px; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📦 <span>Encomendas</span></h1>
+  <p>// rastreio automático via 17track</p>
+</header>
+
+<!-- API Key Bar -->
+<div class="api-bar">
+  <label>🔑 17TRACK API KEY:</label>
+  <input type="password" id="api-key" placeholder="Cole sua chave aqui..." oninput="salvarApiKey()">
+  <span class="api-status none" id="api-status">⬤ sem chave</span>
+  <a class="api-link" href="https://api.17track.net/en/signup" target="_blank">↗ Criar conta grátis</a>
+</div>
+
+<div class="layout">
+  <!-- Formulário -->
+  <div class="card">
+    <h2>Nova Encomenda</h2>
+    <div class="field">
+      <label>E-mail</label>
+      <input type="email" id="inp-email" placeholder="cliente@email.com">
+    </div>
+    <div class="field">
+      <label>Encomenda</label>
+      <input type="text" id="inp-encomenda" placeholder="Ex: Tênis Nike Air Max">
+    </div>
+    <div class="field">
+      <label>Valor (R$)</label>
+      <input type="number" id="inp-valor" placeholder="0,00" step="0.01" min="0">
+    </div>
+    <div class="field">
+      <label>Código de Rastreio</label>
+      <input type="text" id="inp-codigo" placeholder="AA123456789BR" oninput="detectarTransportadora()">
+      <div class="hint" id="carrier-hint" style="display:none;">
+        Detectado: <span class="badge" id="carrier-detected"></span>
+      </div>
+    </div>
+    <button class="btn" onclick="adicionar()">+ Adicionar Encomenda</button>
+    <button class="btn-refresh" id="btn-refresh" onclick="atualizarTodos()" disabled>
+      <span id="refresh-icon">↻</span> Atualizar todos via 17Track
+    </button>
+
+    <div class="carriers-info">
+      <h3>Transportadoras suportadas</h3>
+      <div class="carriers-grid" id="carriers-grid"></div>
+    </div>
+  </div>
+
+  <!-- Lista -->
+  <div>
+    <div class="stats">
+      <div class="stat"><div class="num" id="stat-total">0</div><div class="label">Encomendas</div></div>
+      <div class="stat"><div class="num" id="stat-valor">R$0</div><div class="label">Valor Total</div></div>
+      <div class="stat"><div class="num" id="stat-clientes">0</div><div class="label">Clientes</div></div>
+    </div>
+    <div class="card">
+      <div class="search-bar">
+        <input type="text" id="search" placeholder="Buscar por email, encomenda, código..." oninput="renderizar()">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>E-mail</th>
+              <th>Encomenda</th>
+              <th>Valor</th>
+              <th>Status</th>
+              <th>Último evento</th>
+              <th>Código</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="empty" class="empty" style="display:none;">Nenhuma encomenda encontrada.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de eventos -->
+<div class="modal-overlay" id="modal" onclick="fecharModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modal-title">Histórico de rastreio</h3>
+      <button class="modal-close" onclick="fecharModal()">✕ fechar</button>
+    </div>
+    <div id="modal-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Transportadoras locais ───────────────────────────────────────────────────
+const TRANSPORTADORAS = [
+  { nome:'Correios',       cor:'#f5d800', detectar: c => /^[A-Z]{2}\d{9}[A-Z]{2}$/.test(c),  url: c => `https://rastreamento.correios.com.br/app/index.php?objeto=${c}` },
+  { nome:'Shopee Express', cor:'#ff5100', detectar: c => /^SP\d+$/.test(c),                   url: c => `https://spx.com.br/track/?tracking_number=${c}` },
+  { nome:'Mercado Livre',  cor:'#ffe600', detectar: c => /^(OI|MP)\d{10,}$/.test(c),          url: c => `https://www.mercadolivre.com.br/envios/tracking?search=${c}` },
+  { nome:'Jadlog',         cor:'#00a859', detectar: c => /^JD\d+$/.test(c),                   url: c => `https://www.jadlog.com.br/jadlog/tracking.jad?cte=${c}` },
+  { nome:'Loggi',          cor:'#7c3aed', detectar: c => /^LG\d+$/.test(c),                   url: c => `https://www.loggi.com/rastreador/?p=${c}` },
+  { nome:'Mandaê',         cor:'#ff6b35', detectar: c => /^MD\d+$/.test(c),                   url: c => `https://rastreio.mandae.com.br/?trackingCode=${c}` },
+  { nome:'Total Express',  cor:'#0057a8', detectar: c => /^TE\d+$/.test(c),                   url: c => `https://www.totalexpress.com.br/rastreamento?chave=${c}` },
+  { nome:'UPS',            cor:'#351c15', detectar: c => /^1Z[A-Z0-9]{16}$/.test(c),          url: c => `https://www.ups.com/track?tracknum=${c}` },
+  { nome:'FedEx',          cor:'#4d148c', detectar: c => /^\d{12}$/.test(c),                  url: c => `https://www.fedex.com/fedextrack/?trknbr=${c}` },
+  { nome:'DHL',            cor:'#ffcc00', detectar: c => /^\d{10,11}$/.test(c),               url: c => `https://www.dhl.com/br-pt/home/rastreamento.html?tracking-id=${c}` },
+  { nome:'UPS',            cor:'#351c15', detectar: c => /^1Z/.test(c),                       url: c => `https://www.ups.com/track?tracknum=${c}` },
+  { nome:'Outro',          cor:'#555570', detectar: () => true,                                url: c => `https://t.17track.net/en#nums=${c}` },
+];
+
+function identificar(codigo) {
+  const c = (codigo || '').trim().toUpperCase();
+  return TRANSPORTADORAS.find(t => t.detectar(c)) || TRANSPORTADORAS[TRANSPORTADORAS.length - 1];
+}
+
+// ── Status map 17track ───────────────────────────────────────────────────────
+const STATUS_MAP = {
+  0:   { label: 'Não rastreado', cls: 'unknown' },
+  10:  { label: 'Em trânsito',   cls: 'transit' },
+  20:  { label: 'Expirado',      cls: 'expired' },
+  30:  { label: 'Entregue',      cls: 'delivered' },
+  35:  { label: 'Não entregue',  cls: 'undelivered' },
+  40:  { label: 'Retornando',    cls: 'undelivered' },
+  50:  { label: 'Retornado',     cls: 'undelivered' },
+  60:  { label: 'Falhou',        cls: 'undelivered' },
+  '-1':{ label: 'Inválido',      cls: 'unknown' },
+};
+
+function getStatus(code) {
+  return STATUS_MAP[code] || { label: 'Desconhecido', cls: 'unknown' };
+}
+
+// ── Carriers grid ────────────────────────────────────────────────────────────
+(function() {
+  const grid = document.getElementById('carriers-grid');
+  const unique = [];
+  const seen = new Set();
+  TRANSPORTADORAS.slice(0,-1).forEach(t => { if (!seen.has(t.nome)) { seen.add(t.nome); unique.push(t); } });
+  unique.forEach(t => {
+    const div = document.createElement('div');
+    div.className = 'carrier-item';
+    div.innerHTML = `<div class="dot" style="background:${t.cor}"></div>${t.nome}`;
+    grid.appendChild(div);
+  });
+  // Add note about 17track
+  const note = document.createElement('div');
+  note.className = 'carrier-item';
+  note.style.gridColumn = '1/-1';
+  note.style.color = 'var(--accent2)';
+  note.style.marginTop = '4px';
+  note.innerHTML = `<div class="dot" style="background:var(--accent2)"></div>+ 2600 via 17Track API`;
+  grid.appendChild(note);
+})();
+
+function detectarTransportadora() {
+  const codigo = document.getElementById('inp-codigo').value.trim();
+  const hint = document.getElementById('carrier-hint');
+  const badge = document.getElementById('carrier-detected');
+  if (codigo.length >= 3) {
+    const t = identificar(codigo);
+    hint.style.display = 'flex';
+    badge.textContent = t.nome;
+    badge.style.color = t.cor;
+    badge.style.borderColor = t.cor + '55';
+    badge.style.background = t.cor + '18';
+  } else {
+    hint.style.display = 'none';
+  }
+}
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+let encomendas = JSON.parse(localStorage.getItem('enc_v3') || '[]');
+
+function salvarDados() {
+  localStorage.setItem('enc_v3', JSON.stringify(encomendas));
+}
+
+function salvarApiKey() {
+  const key = document.getElementById('api-key').value.trim();
+  localStorage.setItem('17track_key', key);
+  atualizarStatusApi(key);
+}
+
+function atualizarStatusApi(key) {
+  const el = document.getElementById('api-status');
+  const btn = document.getElementById('btn-refresh');
+  if (key) {
+    el.textContent = '⬤ chave configurada';
+    el.className = 'api-status ok';
+    btn.disabled = false;
+  } else {
+    el.textContent = '⬤ sem chave';
+    el.className = 'api-status none';
+    btn.disabled = true;
+  }
+}
+
+// Carregar chave salva
+(function() {
+  const savedKey = localStorage.getItem('17track_key') || '';
+  if (savedKey) {
+    document.getElementById('api-key').value = savedKey;
+    atualizarStatusApi(savedKey);
+  }
+})();
+
+// ── Toast ────────────────────────────────────────────────────────────────────
+function toast(msg, cor) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = cor || 'var(--accent)';
+  t.style.color = cor ? '#fff' : '#0a0a0f';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── CRUD ─────────────────────────────────────────────────────────────────────
+function adicionar() {
+  const email     = document.getElementById('inp-email').value.trim();
+  const encomenda = document.getElementById('inp-encomenda').value.trim();
+  const valor     = parseFloat(document.getElementById('inp-valor').value);
+  const codigo    = document.getElementById('inp-codigo').value.trim().toUpperCase();
+
+  if (!email || !encomenda || isNaN(valor) || !codigo) { toast('⚠️ Preencha todos os campos!', '#ff5a5a'); return; }
+
+  encomendas.push({
+    id: Date.now(), email, encomenda, valor, codigo,
+    status: null, lastEvent: null, events: [], updatedAt: null
+  });
+  salvarDados();
+  ['inp-email','inp-encomenda','inp-valor','inp-codigo'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('carrier-hint').style.display = 'none';
+  renderizar();
+  toast('✅ Encomenda adicionada!');
+
+  // Auto-rastrear se tiver chave
+  const key = localStorage.getItem('17track_key');
+  if (key) {
+    const enc = encomendas[encomendas.length - 1];
+    rastrearCodigos([enc.codigo]).then(() => renderizar());
+  }
+}
+
+function remover(id) {
+  encomendas = encomendas.filter(e => e.id !== id);
+  salvarDados();
+  renderizar();
+  toast('🗑️ Removida!');
+}
+
+// ── 17Track API ──────────────────────────────────────────────────────────────
+async function chamar17Track(endpoint, payload) {
+  const key = localStorage.getItem('17track_key') || '';
+  if (!key) { toast('⚠️ Configure sua chave 17Track!', '#ff5a5a'); return null; }
+
+  const res = await fetch(`https://api.17track.net/track/v2.2/${endpoint}`, {
+    method: 'POST',
+    headers: { '17token': key, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+async function rastrearCodigos(codigos) {
+  try {
+    // Registrar
+    await chamar17Track('register', codigos.map(c => ({ number: c, auto_detection: true })));
+
+    // Aguardar um momento e buscar info
+    await new Promise(r => setTimeout(r, 1500));
+    const data = await chamar17Track('gettrackinfo', codigos.map(c => ({ number: c })));
+    if (!data) return;
+
+    const items = data.data?.accepted || [];
+    items.forEach(item => {
+      const enc = encomendas.find(e => e.codigo === item.number);
+      if (!enc) return;
+
+      const track = item.track;
+      enc.status = track?.e ?? null;
+      enc.updatedAt = new Date().toLocaleString('pt-BR');
+
+      // Eventos
+      const eventos = track?.z || [];
+      enc.events = eventos.map(ev => ({
+        time: ev.a,
+        desc: ev.z,
+        location: ev.c || ''
+      }));
+
+      // Último evento
+      if (enc.events.length > 0) {
+        enc.lastEvent = enc.events[0].desc;
+      }
+    });
+
+    salvarDados();
+  } catch (err) {
+    console.error('17Track error:', err);
+    toast('❌ Erro ao consultar 17Track: ' + err.message, '#ff5a5a');
+  }
+}
+
+async function atualizarTodos() {
+  if (encomendas.length === 0) { toast('Nenhuma encomenda para atualizar.'); return; }
+
+  const btn = document.getElementById('btn-refresh');
+  const icon = document.getElementById('refresh-icon');
+  btn.disabled = true;
+  icon.className = 'spin';
+  icon.textContent = '↻';
+
+  try {
+    // Processar em lotes de 40
+    const codigos = encomendas.map(e => e.codigo);
+    for (let i = 0; i < codigos.length; i += 40) {
+      await rastrearCodigos(codigos.slice(i, i + 40));
+    }
+    renderizar();
+    toast('✅ Rastreios atualizados!');
+  } finally {
+    btn.disabled = false;
+    icon.className = '';
+    icon.textContent = '↻';
+    atualizarStatusApi(localStorage.getItem('17track_key'));
+  }
+}
+
+function abrirSite(codigo) {
+  const t = identificar(codigo);
+  window.open(t.url(codigo), '_blank');
+}
+
+// ── Modal de eventos ─────────────────────────────────────────────────────────
+function abrirModal(id) {
+  const enc = encomendas.find(e => e.id === id);
+  if (!enc) return;
+
+  document.getElementById('modal-title').textContent = `${enc.encomenda} · ${enc.codigo}`;
+  const body = document.getElementById('modal-body');
+
+  if (!enc.events || enc.events.length === 0) {
+    body.innerHTML = `<p style="color:var(--muted);font-family:'DM Mono',monospace;font-size:0.82rem;">Nenhum evento disponível. Clique em "Atualizar todos via 17Track" para buscar.</p>`;
+  } else {
+    body.innerHTML = `<div class="timeline">${enc.events.map(ev => `
+      <div class="event">
+        <div class="event-time">${ev.time || ''}</div>
+        <div class="event-desc">${ev.desc || '-'}</div>
+        ${ev.location ? `<div class="event-location">📍 ${ev.location}</div>` : ''}
+      </div>
+    `).join('')}</div>`;
+  }
+
+  document.getElementById('modal').classList.add('open');
+}
+
+function fecharModal(e) {
+  if (!e || e.target === document.getElementById('modal') || e.currentTarget === document.querySelector('.modal-close')) {
+    document.getElementById('modal').classList.remove('open');
+  }
+}
+
+// ── Render ───────────────────────────────────────────────────────────────────
+function renderizar() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const filtradas = encomendas.filter(e =>
+    e.email.toLowerCase().includes(q) ||
+    e.encomenda.toLowerCase().includes(q) ||
+    e.codigo.toLowerCase().includes(q)
+  );
+
+  const tbody = document.getElementById('tbody');
+  const empty = document.getElementById('empty');
+  tbody.innerHTML = '';
+
+  if (filtradas.length === 0) {
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    filtradas.forEach(e => {
+      const t = identificar(e.codigo);
+      const st = e.status !== null ? getStatus(e.status) : { label: 'Pendente', cls: 'unknown' };
+      const lastEv = e.lastEvent ? e.lastEvent.substring(0, 40) + (e.lastEvent.length > 40 ? '…' : '') : '—';
+      const updInfo = e.updatedAt ? `<div style="font-size:0.62rem;color:var(--muted);font-family:'DM Mono',monospace;margin-top:2px;">atualizado: ${e.updatedAt}</div>` : '';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="email-cell" title="${e.email}">${e.email}</td>
+        <td>${e.encomenda}</td>
+        <td class="valor-cell">R$ ${e.valor.toFixed(2).replace('.',',')}</td>
+        <td>
+          <span class="status-pill ${st.cls}">${st.label}</span>
+          ${updInfo}
+        </td>
+        <td><div class="last-event" title="${e.lastEvent || ''}">${lastEv}</div></td>
+        <td class="tracking-cell">${e.codigo}</td>
+        <td>
+          <div class="action-btns">
+            <button class="track-btn" onclick="abrirModal(${e.id})">📋</button>
+            <button class="track-btn" onclick="abrirSite('${e.codigo}')">🔍</button>
+            <button class="del-btn" onclick="remover(${e.id})">✕</button>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  const total = encomendas.length;
+  const valorTotal = encomendas.reduce((s, e) => s + e.valor, 0);
+  const clientes = new Set(encomendas.map(e => e.email)).size;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-valor').textContent = 'R$' + valorTotal.toFixed(0);
+  document.getElementById('stat-clientes').textContent = clientes;
+}
+
+renderizar();
+</script>
+</body>
+</html>
